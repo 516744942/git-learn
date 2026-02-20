@@ -3,6 +3,19 @@ import json
 import os
 from datetime import datetime
 from bs4 import BeautifulSoup
+from deep_translator import GoogleTranslator
+
+def translate_text(text):
+    """Translate English text to Chinese using Google Translator."""
+    if not text or not any(c.isalpha() for c in text):
+        return text
+    try:
+        # 使用 deep-translator 进行翻译
+        translated = GoogleTranslator(source='auto', target='zh-CN').translate(text)
+        return translated
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return text
 
 def fetch_huggingface_daily_papers():
     """Fetch top papers from Hugging Face Daily Papers API."""
@@ -18,9 +31,13 @@ def fetch_huggingface_daily_papers():
             title = paper.get("title", "No Title")
             paper_id = paper.get("id", "")
             url = f"https://huggingface.co/papers/{paper_id}" if paper_id else "#"
-            # API 不直接提供摘要，通常需要进一步抓取，这里保留标题
+            
+            # 翻译标题
+            cn_title = translate_text(title)
+            
             result.append({
-                "title": title,
+                "title": cn_title,
+                "original_title": title,
                 "url": url,
                 "summary": "点击链接查看详细内容"
             })
@@ -33,17 +50,19 @@ def fetch_hackernews_ai():
     """Fetch AI related stories from Hacker News using Algolia API."""
     try:
         print("正在获取 Hacker News AI 热点...")
-        # 搜索过去 24 小时内包含 AI 的热门文章
         url = "https://hn.algolia.com/api/v1/search?query=AI&tags=story&numericFilters=created_at_i>0"
-        # 实际使用时可以动态计算时间戳，这里简化逻辑
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         hits = response.json().get("hits", [])
         
         result = []
         for hit in hits[:5]:
+            title = hit.get("title")
+            cn_title = translate_text(title)
+            
             result.append({
-                "title": hit.get("title"),
+                "title": cn_title,
+                "original_title": title,
                 "url": hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID')}",
                 "score": hit.get("points", 0)
             })
@@ -75,13 +94,17 @@ def fetch_github_trending():
             desc_tag = repo.select_one("p")
             description = desc_tag.get_text(strip=True) if desc_tag else "No description provided."
             
-            star_tag = repo.select_one("a.Link--muted") # 通常第一个是总 Star
+            # 翻译描述
+            cn_description = translate_text(description)
+            
+            star_tag = repo.select_one("a.Link--muted")
             stars = star_tag.get_text(strip=True) if star_tag else "0"
             
             result.append({
                 "title": title,
                 "url": link,
-                "description": description,
+                "description": cn_description,
+                "original_description": description,
                 "stars": stars
             })
         return result
@@ -92,8 +115,8 @@ def fetch_github_trending():
 def generate_briefing():
     """Aggregate and format the briefing."""
     hf_papers = fetch_huggingface_daily_papers()
-    hn_stories = fetch_hackernews_ai()
     gh_trending = fetch_github_trending()
+    hn_stories = fetch_hackernews_ai()
     
     date_str = datetime.now().strftime("%Y-%m-%d")
     markdown_report = f"# 🤖 AI 每日简报 - {date_str}\n\n"
@@ -120,6 +143,5 @@ def generate_briefing():
 if __name__ == "__main__":
     report = generate_briefing()
     print(report)
-    # Save to file for backward compatibility (optional if using module import)
     with open("daily_briefing.md", "w") as f:
         f.write(report)
