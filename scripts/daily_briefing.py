@@ -1,7 +1,10 @@
-
 import os
 import sys
-import subprocess
+# 确保可以导入同目录下的脚本
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from fetch_news import generate_briefing
+from push_feishu import push_to_feishu
 
 def main():
     webhook_url = os.environ.get("FEISHU_WEBHOOK_URL")
@@ -14,13 +17,13 @@ def main():
 
     print("--- Starting Daily Briefing ---")
     
-    # 1. Fetch News
+    # 1. 直接在内存中生成简报
     print("1. Fetching news...")
-    subprocess.run(["python3", "scripts/fetch_news.py"], check=True)
+    report = generate_briefing()
     
-    # 2. Push to Feishu
+    # 2. 直接推送简报内容
     print("2. Pushing to Feishu...")
-    subprocess.run(["python3", "scripts/push_feishu.py", webhook_url], check=True)
+    push_to_feishu(report, webhook_url)
     
     print("--- Briefing Complete ---")
 
