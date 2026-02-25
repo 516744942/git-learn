@@ -49,8 +49,11 @@ def fetch_huggingface_daily_papers():
 def fetch_hackernews_ai():
     """Fetch AI related stories from Hacker News using Algolia API."""
     try:
+        import time
         print("正在获取 Hacker News AI 热点...")
-        url = "https://hn.algolia.com/api/v1/search?query=AI&tags=story&numericFilters=created_at_i>0"
+        # 限制拉取过去 48 小时内发布的内容，避免每天拉取到历史最高分文章
+        recent_timestamp = int(time.time()) - 48 * 3600
+        url = f"https://hn.algolia.com/api/v1/search?query=AI&tags=story&numericFilters=created_at_i>{recent_timestamp}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         hits = response.json().get("hits", [])
